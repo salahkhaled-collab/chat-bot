@@ -1,0 +1,34 @@
+{
+  "name": "Pulse Gym",
+  "tagline": "Train smarter, any time of day.",
+  "city": "New Cairo",
+  "address": "90th Street, Fifth Settlement, New Cairo",
+  "phone": "+20 100 000 0000",
+  "currency": "EGP",
+  "hours": [
+    { "days": "Saturday to Thursday", "open": "6:00 AM", "close": "12:00 AM" },
+    { "days": "Friday", "open": "2:00 PM", "close": "11:00 PM" }
+  ],
+  "plans": [
+    { "name": "Monthly", "price": 1500, "period": "month", "perks": ["Full gym access", "Locker and showers", "1 free InBody scan"] },
+    { "name": "3 Months", "price": 3900, "period": "3 months", "perks": ["Everything in Monthly", "2 group classes a week", "1 PT session"] },
+    { "name": "Annual", "price": 12000, "period": "year", "perks": ["Unlimited group classes", "4 PT sessions", "2 weeks membership freeze"] },
+    { "name": "Student", "price": 1100, "period": "month", "perks": ["Full gym access", "Valid university ID required"] }
+  ],
+  "trial": "One free day pass for first-time visitors, booked in advance.",
+  "freeze": "Annual members can freeze up to 2 weeks. Ask at reception at least 3 days before.",
+  "classes": [
+    { "name": "Yoga", "schedule": "Sunday and Tuesday, 7:00 PM", "coach": "Coach Mariam" },
+    { "name": "CrossFit", "schedule": "Saturday, Monday and Wednesday, 8:00 PM", "coach": "Coach Omar" },
+    { "name": "Spinning", "schedule": "Sunday and Thursday, 6:30 PM", "coach": "Coach Youssef" },
+    { "name": "Boxing", "schedule": "Monday and Wednesday, 9:00 PM", "coach": "Coach Karim" },
+    { "name": "Zumba", "schedule": "Saturday and Tuesday, 6:00 PM", "coach": "Coach Nour" }
+  ],
+  "trainers": [
+    { "name": "Omar", "focus": "Strength and CrossFit" },
+    { "name": "Mariam", "focus": "Yoga and mobility" },
+    { "name": "Karim", "focus": "Boxing and conditioning" },
+    { "name": "Nour", "focus": "Weight loss and cardio" }
+  ],
+  "personalTraining": "Personal training costs 400 EGP per session or 3,500 EGP for 10 sessions."
+}

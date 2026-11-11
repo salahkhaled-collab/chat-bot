@@ -3,41 +3,77 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sports Bot</title>
+    <meta name="theme-color" content="#FAF6EE" />
+    <title>Pulse Gym</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&family=Fraunces:opsz,wght@9..144,600&display=swap"
+      rel="stylesheet"
+    />
   </head>
   <body>
-    <div class="app">
-      <header class="topbar">
-        <div class="brand">
-          <span class="brand-mark" aria-hidden="true">SB</span>
-          <div>
-            <h1>Sports Bot</h1>
-            <p>Sports management assistant</p>
-          </div>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <a class="brand" href="#">
+          <span class="brand-mark" aria-hidden="true">P</span>
+          <span id="gym-name" class="brand-name">Pulse Gym</span>
+        </a>
+        <nav class="nav">
+          <a href="#plans">Plans</a>
+          <a href="#classes">Classes</a>
+          <a href="#visit">Visit</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero wrap">
+        <p class="eyebrow" id="gym-city">New Cairo</p>
+        <h1 id="gym-tagline">Train smarter, any time of day.</h1>
+        <p class="lead">
+          Ask our assistant anything: prices, class times, book a session or get a workout plan
+          made for you. It's in the corner of the page, open 24/7.
+        </p>
+        <div class="hero-points">
+          <span>Book classes in chat</span>
+          <span>Personal workout plans</span>
+          <span>Answers in seconds</span>
         </div>
-        <button id="reset" class="link-button" type="button">New chat</button>
-      </header>
+      </section>
 
-      <main id="log" class="log" aria-live="polite">
-        <section id="intro" class="intro">
-          <h2>What do you want to know?</h2>
-          <p>Results, fixtures, standings, players, rules, training or history. Any sport.</p>
-          <ul id="examples" class="examples">
-            <li><button type="button">Al Ahly's last 5 results</button></li>
-            <li><button type="button">How does the offside rule work?</button></li>
-            <li><button type="button">Who has the most NBA championships?</button></li>
-            <li><button type="button">Weekly training plan for a U16 football team</button></li>
-          </ul>
-        </section>
-      </main>
+      <section id="plans" class="wrap section">
+        <h2>Membership plans</h2>
+        <div id="plan-list" class="plans"></div>
+      </section>
 
-      <form id="form" class="composer" autocomplete="off">
-        <label for="input" class="visually-hidden">Message</label>
-        <textarea id="input" rows="1" placeholder="Type a question" required></textarea>
-        <button id="send" type="submit">Send</button>
-      </form>
-      <p class="hint">Enter to send, Shift + Enter for a new line.</p>
-    </div>
+      <section id="classes" class="wrap section">
+        <h2>Weekly classes</h2>
+        <div class="table-card">
+          <table>
+            <thead><tr><th>Class</th><th>When</th><th>Coach</th></tr></thead>
+            <tbody id="class-list"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="visit" class="wrap section visit">
+        <div>
+          <h2>Opening hours</h2>
+          <ul id="hours-list" class="plain-list"></ul>
+        </div>
+        <div>
+          <h2>Find us</h2>
+          <p id="gym-address"></p>
+          <p id="gym-phone"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="wrap footer">
+      <span id="footer-name">Pulse Gym</span> · Assistant powered by Dialogflow
+    </footer>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
