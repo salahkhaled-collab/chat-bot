@@ -112,6 +112,13 @@ df-messenger {
   --df-messenger-minimized-chat-close-icon-color: #a8532c;
 }
 
+body { transition: padding-right .25s ease; }
+
+@media (min-width: 1100px) {
+  body.chat-open { padding-right: 420px; }
+  body.chat-open .wrap { margin-left: 32px; }
+}
+
 @media (max-width: 720px) {
   .wrap, .hero, .section { padding-left: 16px; padding-right: 16px; }
   .nav { gap: 16px; }

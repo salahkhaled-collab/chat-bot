@@ -73,7 +73,12 @@ function mountAssistant(): void {
   messenger.setAttribute("chat-title", `${gym.name} Assistant`);
   messenger.setAttribute("agent-id", agentId);
   messenger.setAttribute("language-code", "en");
-  if (window.innerWidth > 720) messenger.setAttribute("expand", "true");
+  const setOpen = (event: Event) => {
+    const detail = (event as CustomEvent<{ isOpen?: boolean }>).detail;
+    document.body.classList.toggle("chat-open", Boolean(detail?.isOpen));
+  };
+  messenger.addEventListener("df-chat-open-changed", setOpen);
+  window.addEventListener("df-chat-open-changed", setOpen);
   document.body.append(messenger);
 }
 
