@@ -81,7 +81,7 @@ function phrase(text) {
   return { id: randomUUID(), data: parts, isTemplate: false, count: 0, lang: "en", updated: 0 };
 }
 
-function intent(name, { phrases = [], replies = [], params = [], webhook = false, events = [], fallback = false, action = "", priority = 500000 }) {
+function intent(name, { phrases = [], replies = [], rich = null, params = [], webhook = false, events = [], fallback = false, action = "", priority = 500000 }) {
   write(`intents/${name}.json`, {
     id: randomUUID(),
     name,
@@ -105,7 +105,10 @@ function intent(name, { phrases = [], replies = [], params = [], webhook = false
         noInputPromptMessages: [],
         outputDialogContexts: [],
       })),
-      messages: replies.length ? [{ type: "0", title: "", textToSpeech: "", lang: "en", speech: replies, condition: "" }] : [],
+      messages: [
+        ...(replies.length ? [{ type: "0", title: "", textToSpeech: "", lang: "en", speech: replies, condition: "" }] : []),
+        ...(rich ? [{ type: "4", title: "", payload: { richContent: rich }, textToSpeech: "", lang: "en", condition: "" }] : []),
+      ],
       speech: [],
     }],
     priority,
@@ -121,8 +124,7 @@ function intent(name, { phrases = [], replies = [], params = [], webhook = false
 }
 
 const hours = gym.hours.map((h) => `${h.days}: ${h.open} to ${h.close}`).join(". ");
-const plans = gym.plans.map((p) => `${p.name}: ${money(p.price)} per ${p.period}`).join(". ");
-const classes = gym.classes.map((c) => `${c.name} (${c.schedule})`).join(", ");
+const chips = (...labels) => ({ type: "chips", options: labels.map((text) => ({ text })) });
 const trainers = gym.trainers.map((t) => `${t.name} – ${t.focus}`).join(", ");
 
 intent("Default Welcome Intent", {
@@ -130,6 +132,7 @@ intent("Default Welcome Intent", {
   action: "input.welcome",
   phrases: ["hi", "hello", "hey", "good morning", "good evening", "salam", "hey there"],
   replies: [`Hi! I'm the ${gym.name} assistant. I can tell you about memberships, classes and opening hours, book you a class, or build you a workout plan. What do you need?`],
+  rich: [[chips("Membership prices", "Class schedule", "Book a class", "Make me a workout plan", "Opening hours")]],
 });
 
 intent("Default Fallback Intent", {
@@ -140,13 +143,18 @@ intent("Default Fallback Intent", {
 });
 
 intent("Membership Plans", {
-  phrases: ["how much is the membership", "what are your prices", "membership plans", "how much does it cost", "price list", "do you have a student discount", "annual membership price", "how much per month", "subscription prices"],
-  replies: [`Our plans: ${plans}. Which one suits you?`],
+  phrases: ["membership prices", "how much is the membership", "what are your prices", "membership plans", "how much does it cost", "price list", "do you have a student discount", "annual membership price", "how much per month", "subscription prices"],
+  replies: ["Here are our membership plans:"],
+  rich: [
+    ...gym.plans.map((p) => [{ type: "description", title: `${p.name} · ${money(p.price)} / ${p.period}`, text: p.perks }]),
+    [chips("Book a free trial", "Class schedule")],
+  ],
 });
 
 intent("Opening Hours", {
   phrases: ["what time do you open", "opening hours", "when do you close", "are you open on friday", "working hours", "what are your hours", "are you open now"],
   replies: [`We're open ${hours}.`],
+  rich: [[chips("Where are you?", "Book a class")]],
 });
 
 intent("Location", {
@@ -156,7 +164,11 @@ intent("Location", {
 
 intent("Class Schedule", {
   phrases: ["what classes do you have", "class schedule", "when is yoga", "do you have crossfit", "group classes", "when is boxing", "spinning times", "zumba schedule"],
-  replies: [`Our classes: ${classes}. Want me to book one for you?`],
+  replies: ["Here's our weekly class schedule:"],
+  rich: [
+    [{ type: "description", title: "Weekly classes", text: gym.classes.map((c) => `${c.name} — ${c.schedule} (${c.coach})`) }],
+    [chips(...gym.classes.map((c) => `Book ${c.name}`))],
+  ],
 });
 
 intent("Trainers", {
@@ -166,7 +178,8 @@ intent("Trainers", {
 
 intent("Free Trial", {
   phrases: ["can I try the gym", "free trial", "day pass", "can I visit first", "do you have a trial"],
-  replies: [`${gym.trial} Just say "book a class" or visit reception.`],
+  replies: [gym.trial],
+  rich: [[chips("Book a free trial", "Membership prices")]],
 });
 
 intent("Freeze Membership", {

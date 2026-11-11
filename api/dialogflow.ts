@@ -38,7 +38,7 @@ function prettyDate(iso: string): string {
   }).format(new Date(iso));
 }
 
-function bookClass(params: Params): string {
+function bookClass(params: Params): Reply {
   const wanted = text(params, "class_type").toLowerCase();
   const name = text(params, "name") || "there";
   const phone = text(params, "phone");
@@ -46,59 +46,177 @@ function bookClass(params: Params): string {
   const cls = gym.classes.find((c) => c.name.toLowerCase() === wanted);
 
   if (!cls) {
-    return `Sorry, we don't run ${wanted || "that class"}. We have ${gym.classes.map((c) => c.name).join(", ")}.`;
+    return { text: `Sorry, we don't run ${wanted || "that class"}. We have ${gym.classes.map((c) => c.name).join(", ")}.` };
   }
   if (!date || Number.isNaN(Date.parse(date))) {
-    return `Which day would you like to come? ${cls.name} runs ${cls.schedule}.`;
+    return { text: `Which day would you like to come? ${cls.name} runs ${cls.schedule}.` };
   }
 
   const day = weekdayOf(date);
   if (!cls.schedule.includes(day)) {
-    return `${cls.name} doesn't run on ${day}. It's on ${cls.schedule}. Say "book ${cls.name}" again with one of those days.`;
+    const days = WEEKDAYS.filter((d) => cls.schedule.includes(d));
+    return {
+      text: `${cls.name} doesn't run on ${day}. It's on ${cls.schedule}. Pick one of those days:`,
+      rich: [[{ type: "chips", options: days.map((d) => ({ text: `Book ${cls.name} on ${d}` })) }]],
+    };
   }
 
   const ref = `PG-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
   const time = cls.schedule.split(",").pop()?.trim() ?? "";
-  return [
-    `You're booked, ${name}!`,
-    `${cls.name} with ${cls.coach} on ${prettyDate(date)}${time ? ` at ${time}` : ""}.`,
-    `Booking reference: ${ref}. We'll confirm by SMS on ${phone || "your number"}.`,
-    `Please arrive 10 minutes early.`,
-  ].join(" ");
-}
-
-function templatePlan(goal: string, level: string, days: number): string {
-  const splits: Record<number, string[]> = {
-    2: ["Full body A", "Full body B"],
-    3: ["Upper body", "Lower body", "Full body + core"],
-    4: ["Upper body", "Lower body", "Push + core", "Pull + legs"],
-    5: ["Chest + triceps", "Back + biceps", "Legs", "Shoulders + core", "Full body conditioning"],
+  const when = `${prettyDate(date)}${time ? ` at ${time}` : ""}`;
+  const summary = `You're booked, ${name}! ${cls.name} with ${cls.coach} on ${when}. Booking reference: ${ref}. We'll confirm by SMS on ${phone || "your number"}. Please arrive 10 minutes early.`;
+  return {
+    text: summary,
+    intro: `You're booked, ${name}!`,
+    rich: [
+      [
+        {
+          type: "description",
+          title: `✓ ${cls.name} booked`,
+          text: [when, `Coach: ${cls.coach.replace(/^Coach /, "")}`, `Reference: ${ref}`, `SMS confirmation to ${phone || "your number"}`, "Please arrive 10 minutes early."],
+        },
+      ],
+      [{ type: "chips", options: [{ text: "Make me a workout plan" }, { text: "Opening hours" }] }],
+    ],
   };
-  const plan = splits[Math.min(Math.max(days, 2), 5)];
-  const cardio = goal.includes("lose") ? "Finish each session with 20 minutes of cardio." : "Add 10 minutes of light cardio to warm up.";
-  return [
-    `Here's a ${plan.length}-day ${level} plan (goal: ${goal}):`,
-    ...plan.map((p, i) => `Day ${i + 1}: ${p}, 3–4 sets of 8–12 reps per exercise.`),
-    cardio,
-    "Ask a coach at reception to check your form in the first week.",
-  ].join("\n");
 }
 
-async function workoutPlan(params: Params): Promise<string> {
-  const goal = text(params, "goal") || "general fitness";
-  const level = text(params, "level") || "beginner-friendly";
-  const days = Number(text(params, "days")) || 3;
+interface Exercise {
+  name: string;
+  sets: number;
+  reps: string;
+}
+
+interface PlanDay {
+  title: string;
+  exercises: Exercise[];
+}
+
+interface Plan {
+  days: PlanDay[];
+  tip: string;
+}
+
+interface Reply {
+  text: string;
+  intro?: string;
+  rich?: unknown[][];
+}
+
+const SPLITS: Record<number, [string, string[]][]> = {
+  2: [
+    ["Full body A", ["Goblet squat", "Push-ups", "Dumbbell row", "Plank"]],
+    ["Full body B", ["Romanian deadlift", "Dumbbell shoulder press", "Lat pulldown", "Glute bridge"]],
+  ],
+  3: [
+    ["Upper body", ["Bench press", "Lat pulldown", "Dumbbell shoulder press", "Seated cable row"]],
+    ["Lower body", ["Barbell squat", "Romanian deadlift", "Walking lunges", "Calf raises"]],
+    ["Full body + core", ["Deadlift", "Push-ups", "Dumbbell row", "Plank"]],
+  ],
+  4: [
+    ["Upper body", ["Bench press", "Lat pulldown", "Dumbbell shoulder press", "Seated cable row"]],
+    ["Lower body", ["Barbell squat", "Romanian deadlift", "Leg press", "Calf raises"]],
+    ["Push + core", ["Incline dumbbell press", "Lateral raises", "Triceps pushdown", "Plank"]],
+    ["Pull + legs", ["Deadlift", "Assisted pull-ups", "Leg curl", "Bicep curl"]],
+  ],
+  5: [
+    ["Chest + triceps", ["Bench press", "Incline dumbbell press", "Chest fly", "Triceps pushdown"]],
+    ["Back + biceps", ["Deadlift", "Lat pulldown", "Seated cable row", "Bicep curl"]],
+    ["Legs", ["Barbell squat", "Leg press", "Romanian deadlift", "Calf raises"]],
+    ["Shoulders + core", ["Overhead press", "Lateral raises", "Face pulls", "Plank"]],
+    ["Full body conditioning", ["Kettlebell swings", "Push-ups", "Walking lunges", "Mountain climbers"]],
+  ],
+};
+
+function templatePlan(goal: string, days: number): Plan {
+  const [sets, reps] = goal.includes("strong")
+    ? [4, "5"]
+    : goal.includes("lose")
+      ? [3, "12-15"]
+      : goal.includes("muscle")
+        ? [3, "8-12"]
+        : [3, "10"];
+  const split = SPLITS[Math.min(Math.max(days, 2), 5)];
+  return {
+    days: split.map(([title, names]) => ({
+      title,
+      exercises: names.map((name) => ({ name, sets: name === "Plank" ? 3 : sets, reps: name === "Plank" ? "30-45 sec" : reps })),
+    })),
+    tip: goal.includes("lose")
+      ? "Finish each session with 20 minutes of cardio, and ask a coach to check your form in the first week."
+      : "Warm up for 10 minutes, add weight slowly, and ask a coach to check your form in the first week.",
+  };
+}
+
+function parsePlan(raw: string): Plan | null {
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
   try {
-    const { text: reply, truncated } = await ask({
-      system: `You are the personal-training assistant at ${gym.name}. Write short, safe, practical gym plans as plain text, no markdown tables. Max 12 lines.`,
-      question: `Make a weekly gym plan. Goal: ${goal}. Level: ${level}. Days per week: ${days}. One line per training day listing 3–5 exercises with sets x reps, then one line of advice.`,
+    const data = JSON.parse(raw.slice(start, end + 1)) as Partial<Plan>;
+    const days = (data.days ?? [])
+      .map((d) => ({
+        title: String(d?.title ?? "").trim(),
+        exercises: (d?.exercises ?? [])
+          .filter((e) => e && typeof e.name === "string" && e.name.trim())
+          .map((e) => ({ name: e.name.trim(), sets: Number(e.sets) || 3, reps: String(e.reps ?? "10") })),
+      }))
+      .filter((d) => d.title && d.exercises.length);
+    return days.length ? { days, tip: String(data.tip ?? "").trim() } : null;
+  } catch {
+    return null;
+  }
+}
+
+function videoLink(exercise: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise} proper form`)}`;
+}
+
+function planReply(plan: Plan, goal: string): Reply {
+  const lines = plan.days.map(
+    (d, i) => `Day ${i + 1} – ${d.title}\n${d.exercises.map((e) => `• ${e.name}: ${e.sets} × ${e.reps}`).join("\n")}`
+  );
+  const intro = `Your ${plan.days.length}-day plan to ${goal}. Tap ▶ under each day to see how an exercise is done.`;
+  const rich: unknown[][] = [
+    [{ type: "description", title: "Your workout plan", text: [`Goal: ${goal}`, `${plan.days.length} days a week`] }],
+    ...plan.days.map((d, i) => [
+      {
+        type: "description",
+        title: `Day ${i + 1} · ${d.title}`,
+        text: d.exercises.map((e) => `${e.name} — ${e.sets} × ${e.reps}`),
+      },
+      {
+        type: "chips",
+        options: d.exercises.map((e) => ({ text: `▶ ${e.name}`, link: videoLink(e.name) })),
+      },
+    ]),
+  ];
+  if (plan.tip) rich.push([{ type: "description", title: "Coach's tip", text: [plan.tip] }]);
+  rich.push([{ type: "chips", options: [{ text: "Book a class" }, { text: "Membership prices" }] }]);
+  return { text: [intro, ...lines, plan.tip].filter(Boolean).join("\n\n"), intro, rich };
+}
+
+async function workoutPlan(params: Params): Promise<Reply> {
+  const goal = text(params, "goal") || "general fitness";
+  const level = text(params, "level") || "beginner";
+  const days = Math.min(Math.max(Number(text(params, "days")) || 3, 1), 6);
+  try {
+    const { text: raw, truncated } = await ask({
+      system: `You are the personal-training assistant at ${gym.name}. You reply with JSON only, no other text.`,
+      question: [
+        `Make a weekly gym plan. Goal: ${goal}. Level: ${level}. Training days per week: ${days}.`,
+        "Use 4 or 5 common gym exercises per day with standard English names.",
+        'Return exactly this JSON shape: {"days":[{"title":"Upper body","exercises":[{"name":"Bench press","sets":3,"reps":"8-10"}]}],"tip":"one short sentence"}',
+      ].join("\n"),
       maxTokens: 1500,
       timeoutMs: TIME_BUDGET_MS,
     });
-    return reply && !truncated ? reply : templatePlan(goal, level, days);
-  } catch {
-    return templatePlan(goal, level, days);
+    const plan = truncated ? null : parsePlan(raw);
+    if (plan) return planReply(plan, goal);
+  } catch (e) {
+    console.error(e);
   }
+  return planReply(templatePlan(goal, days), goal);
 }
 
 function wholeSentences(text: string): string {
@@ -137,10 +255,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const params = body.queryResult?.parameters ?? {};
   const question = body.queryResult?.queryText ?? "";
 
-  let reply: string;
+  let reply: Reply;
   if (intent === "Book Class") reply = bookClass(params);
   else if (intent === "Workout Plan") reply = await workoutPlan(params);
-  else reply = await fallback(question);
+  else reply = { text: await fallback(question) };
 
-  return res.status(200).json({ fulfillmentText: reply });
+  return res.status(200).json({
+    fulfillmentText: reply.text,
+    fulfillmentMessages: [
+      { text: { text: [reply.rich ? reply.intro ?? reply.text : reply.text] } },
+      ...(reply.rich ? [{ payload: { richContent: reply.rich } }] : []),
+    ],
+  });
 }
