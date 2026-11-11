@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sports Bot</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #121821;
+    --line: #1f2937;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #22c55e;
+    --user: #1d4ed8;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .app {
+    width: 100%;
+    max-width: 760px;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 16px;
+  }
+  header {
+    padding: 18px 0 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+  header span { color: var(--muted); font-size: 13px; margin-left: auto; }
+
+  #log {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .msg {
+    max-width: 85%;
+    padding: 11px 14px;
+    border-radius: 14px;
+    line-height: 1.5;
+    font-size: 15px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .msg.bot { background: var(--panel); border: 1px solid var(--line); align-self: flex-start; border-bottom-left-radius: 4px; }
+  .msg.user { background: var(--user); align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg.err { background: #2a1214; border: 1px solid #5b1c22; color: #fca5a5; align-self: flex-start; }
+
+  .typing { display: inline-flex; gap: 4px; align-items: center; height: 20px; }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .2s; }
+  .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 10px; }
+  .chip {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 12px; font-size: 13px; cursor: pointer;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  form {
+    display: flex; gap: 10px;
+    padding: 12px 0 calc(16px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+  }
+  input {
+    flex: 1;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 13px 14px; font-size: 16px; outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button.send {
+    background: var(--accent); color: #04130a; border: 0; border-radius: 12px;
+    padding: 0 20px; font-weight: 650; font-size: 15px; cursor: pointer;
+  }
+  button.send:disabled { opacity: .5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="dot"></div>
+    <h1>Sports Bot</h1>
+    <span>Powered by Groq</span>
+  </header>
+
+  <div id="log" aria-live="polite">
+    <div class="msg bot">Ask me about scores, fixtures, standings or player stats.</div>
+  </div>
+
+  <div class="chips" id="chips">
+    <button class="chip" type="button">Latest Premier League results</button>
+    <button class="chip" type="button">Who leads La Liga?</button>
+    <button class="chip" type="button">Next Al Ahly match</button>
+  </div>
+
+  <form id="form" autocomplete="off">
+    <input id="input" placeholder="Ask a sports question..." required>
+    <button class="send" id="send" type="submit">Send</button>
+  </form>
+</div>
+
+<script>
+  const log = document.getElementById("log");
+  const form = document.getElementById("form");
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const chips = document.getElementById("chips");
+  const history = [];
+
+  function add(text, cls) {
+    const el = document.createElement("div");
+    el.className = "msg " + cls;
+    el.textContent = text;
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+    return el;
+  }
+
+  async function ask(text) {
+    chips.remove();
+    add(text, "user");
+    const pending = document.createElement("div");
+    pending.className = "msg bot";
+    pending.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>';
+    log.appendChild(pending);
+    log.scrollTop = log.scrollHeight;
+    send.disabled = true;
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, history }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || "Request failed");
+      pending.textContent = data.reply;
+      history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
+    } catch (e) {
+      pending.className = "msg err";
+      pending.textContent = "Something went wrong: " + e.message;
+    } finally {
+      send.disabled = false;
+      input.focus();
+      log.scrollTop = log.scrollHeight;
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    ask(text);
+  });
+
+  chips.addEventListener("click", (e) => {
+    if (e.target.classList.contains("chip")) ask(e.target.textContent);
+  });
+</script>
+</body>
+</html>
