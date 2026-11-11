@@ -33,9 +33,15 @@ export function getProvider(): Provider & { apiKey: string | undefined; model: s
   };
 }
 
+interface CompleteOptions {
+  tools?: ToolDefinition[];
+  maxTokens?: number;
+  signal?: AbortSignal;
+}
+
 export async function complete(
   messages: Message[],
-  tools: ToolDefinition[]
+  { tools = [], maxTokens, signal }: CompleteOptions = {}
 ): Promise<AssistantMessage> {
   const provider = getProvider();
   if (!provider.apiKey) {
@@ -44,6 +50,7 @@ export async function complete(
 
   const res = await fetch(provider.url, {
     method: "POST",
+    signal,
     headers: {
       Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
@@ -51,8 +58,8 @@ export async function complete(
     body: JSON.stringify({
       model: provider.model,
       messages,
-      tools,
-      tool_choice: "auto",
+      ...(tools.length ? { tools, tool_choice: "auto" } : {}),
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
       temperature: 0.3,
     }),
   });

@@ -1,130 +1,81 @@
 import "./style.css";
-import { formatReply } from "./format";
+import gym from "../data/gym.json";
 
-type Role = "user" | "assistant";
-interface HistoryItem {
-  role: Role;
-  content: string;
-}
-interface ChatResponse {
-  reply?: string;
-  error?: string;
-}
+const MESSENGER_SCRIPT = "https://www.gstatic.com/dialogflow-console/fast/messenger/bootstrap.js?v=1";
 
-function $<T extends HTMLElement>(id: string): T {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing #${id}`);
-  return el as T;
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
 }
 
-const log = $<HTMLElement>("log");
-const form = $<HTMLFormElement>("form");
-const input = $<HTMLTextAreaElement>("input");
-const send = $<HTMLButtonElement>("send");
-const reset = $<HTMLButtonElement>("reset");
-
-let history: HistoryItem[] = [];
-let busy = false;
-
-const WELCOME = "Hi! Ask me about any sport — results, fixtures, standings, rules or training.";
-
-function scrollToBottom(): void {
-  log.scrollTop = log.scrollHeight;
+function setText(id: string, value: string): void {
+  const node = document.getElementById(id);
+  if (node) node.textContent = value;
 }
 
-function addMessage(role: Role, text: string): HTMLElement {
-  const row = document.createElement("article");
-  row.className = `message ${role}`;
-
-  const label = document.createElement("div");
-  label.className = "who";
-  label.textContent = role === "user" ? "You" : "Sports Bot";
-
-  const body = document.createElement("div");
-  body.className = "body";
-  if (role === "assistant") body.innerHTML = formatReply(text);
-  else body.textContent = text;
-
-  row.append(label, body);
-  log.appendChild(row);
-  scrollToBottom();
-  return body;
+function money(n: number): string {
+  return `${n.toLocaleString("en-US")} ${gym.currency}`;
 }
 
-function setBusy(value: boolean): void {
-  busy = value;
-  send.disabled = value;
-  send.textContent = value ? "Sending" : "Send";
-}
+function renderPage(): void {
+  document.title = gym.name;
+  setText("gym-name", gym.name);
+  setText("footer-name", gym.name);
+  setText("gym-city", gym.city);
+  setText("gym-tagline", gym.tagline);
+  setText("gym-address", gym.address);
+  setText("gym-phone", gym.phone);
 
-async function ask(text: string): Promise<void> {
-  if (busy) return;
-  addMessage("user", text);
+  const plans = document.getElementById("plan-list");
+  for (const plan of gym.plans) {
+    const card = el("article", "plan");
+    card.append(el("h3", undefined, plan.name));
+    const price = el("p", "price", money(plan.price));
+    price.append(el("span", undefined, ` / ${plan.period}`));
+    card.append(price);
+    const perks = el("ul");
+    for (const perk of plan.perks) perks.append(el("li", undefined, perk));
+    card.append(perks);
+    plans?.append(card);
+  }
 
-  const body = addMessage("assistant", "");
-  body.classList.add("pending");
-  body.textContent = "Looking that up…";
-  setBusy(true);
+  const classes = document.getElementById("class-list");
+  for (const c of gym.classes) {
+    const row = el("tr");
+    row.append(el("td", undefined, c.name), el("td", undefined, c.schedule), el("td", undefined, c.coach));
+    classes?.append(row);
+  }
 
-  try {
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, history }),
-    });
-    const data = (await res.json().catch(() => ({}))) as ChatResponse;
-    if (!res.ok || data.error || !data.reply) {
-      throw new Error(data.error ?? `Request failed (${res.status})`);
-    }
-    body.classList.remove("pending");
-    body.innerHTML = formatReply(data.reply);
-    history.push({ role: "user", content: text }, { role: "assistant", content: data.reply });
-  } catch (e) {
-    body.classList.remove("pending");
-    body.classList.add("error");
-    body.textContent = `Couldn't get an answer. ${e instanceof Error ? e.message : String(e)}`;
-  } finally {
-    setBusy(false);
-    input.focus();
-    scrollToBottom();
+  const hours = document.getElementById("hours-list");
+  for (const h of gym.hours) {
+    const item = el("li");
+    item.append(el("span", undefined, h.days), el("strong", undefined, `${h.open} – ${h.close}`));
+    hours?.append(item);
   }
 }
 
-function resizeInput(): void {
-  input.style.height = "auto";
-  input.style.height = `${Math.min(input.scrollHeight, 160)}px`;
-}
-
-function submit(): void {
-  const text = input.value.trim();
-  if (!text || busy) return;
-  input.value = "";
-  resizeInput();
-  void ask(text);
-}
-
-form.addEventListener("submit", (e) => {
-  e.preventDefault();
-  submit();
-});
-
-input.addEventListener("input", resizeInput);
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
-    e.preventDefault();
-    submit();
+function mountAssistant(): void {
+  const agentId = import.meta.env.VITE_DIALOGFLOW_AGENT_ID as string | undefined;
+  if (!agentId) {
+    const note = el("div", "setup-note", "Assistant not connected yet: set VITE_DIALOGFLOW_AGENT_ID in Vercel and redeploy.");
+    document.body.append(note);
+    return;
   }
-});
 
-reset.addEventListener("click", () => {
-  if (busy) return;
-  history = [];
-  log.replaceChildren();
-  addMessage("assistant", WELCOME);
-  input.value = "";
-  resizeInput();
-  input.focus();
-});
+  const script = document.createElement("script");
+  script.src = MESSENGER_SCRIPT;
+  document.head.append(script);
 
-addMessage("assistant", WELCOME);
-input.focus();
+  const messenger = document.createElement("df-messenger");
+  messenger.setAttribute("intent", "WELCOME");
+  messenger.setAttribute("chat-title", `${gym.name} Assistant`);
+  messenger.setAttribute("agent-id", agentId);
+  messenger.setAttribute("language-code", "en");
+  if (window.innerWidth > 720) messenger.setAttribute("expand", "true");
+  document.body.append(messenger);
+}
+
+renderPage();
+mountAssistant();
