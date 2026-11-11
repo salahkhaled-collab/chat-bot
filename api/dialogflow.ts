@@ -86,19 +86,24 @@ function templatePlan(goal: string, level: string, days: number): string {
 
 async function workoutPlan(params: Params): Promise<string> {
   const goal = text(params, "goal") || "general fitness";
-  const level = text(params, "level") || "beginner";
+  const level = text(params, "level") || "beginner-friendly";
   const days = Number(text(params, "days")) || 3;
   try {
-    const reply = await ask({
+    const { text: reply, truncated } = await ask({
       system: `You are the personal-training assistant at ${gym.name}. Write short, safe, practical gym plans as plain text, no markdown tables. Max 12 lines.`,
       question: `Make a weekly gym plan. Goal: ${goal}. Level: ${level}. Days per week: ${days}. One line per training day listing 3–5 exercises with sets x reps, then one line of advice.`,
-      maxTokens: 350,
+      maxTokens: 1500,
       timeoutMs: TIME_BUDGET_MS,
     });
-    return reply || templatePlan(goal, level, days);
+    return reply && !truncated ? reply : templatePlan(goal, level, days);
   } catch {
     return templatePlan(goal, level, days);
   }
+}
+
+function wholeSentences(text: string): string {
+  const end = Math.max(text.lastIndexOf(". "), text.lastIndexOf("! "), text.lastIndexOf("? "));
+  return end > 0 ? text.slice(0, end + 1) : "";
 }
 
 async function fallback(question: string): Promise<string> {
@@ -110,7 +115,8 @@ async function fallback(question: string): Promise<string> {
     "Never invent scores. Reply in at most 4 short sentences, plain text, no markdown.",
   ].join("\n");
   try {
-    const reply = await ask({ system, question, useTools: true, maxTokens: 250, timeoutMs: TIME_BUDGET_MS });
+    const { text, truncated } = await ask({ system, question, useTools: true, maxTokens: 1200, timeoutMs: TIME_BUDGET_MS });
+    const reply = truncated ? wholeSentences(text) : text;
     if (reply) return reply;
   } catch (e) {
     console.error(e);

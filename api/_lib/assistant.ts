@@ -28,7 +28,7 @@ export async function ask({
   useTools = false,
   maxTokens = 400,
   timeoutMs,
-}: AskOptions): Promise<string> {
+}: AskOptions): Promise<{ text: string; truncated: boolean }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const messages: Message[] = [
@@ -45,15 +45,16 @@ export async function ask({
         maxTokens,
         signal: controller.signal,
       });
-      messages.push(msg);
-      if (!msg.tool_calls?.length) return (msg.content ?? "").trim();
+      const { truncated } = msg;
+      messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: msg.tool_calls });
+      if (!msg.tool_calls?.length) return { text: (msg.content ?? "").trim(), truncated };
 
       for (const call of msg.tool_calls) {
         const result = await runTool(call.function.name, call.function.arguments);
         messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
       }
     }
-    return "";
+    return { text: "", truncated: false };
   } finally {
     clearTimeout(timer);
   }

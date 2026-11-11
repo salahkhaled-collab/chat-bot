@@ -94,7 +94,7 @@ function intent(name, { phrases = [], replies = [], params = [], webhook = false
       parameters: params.map((p) => ({
         id: randomUUID(),
         name: p.name,
-        required: true,
+        required: p.required !== false,
         dataType: p.type,
         value: `$${p.name}`,
         defaultValue: "",
@@ -205,14 +205,37 @@ intent("Workout Plan", {
     "workout plan to [build muscle|@goal:goal]",
     "I'm a [beginner|@level:level] and want to [get stronger|@goal:goal]",
     "plan for [4|@sys.number-integer:days] days a week",
-    "what should I do at the gym",
+    "create a weekly routine for me",
+    "I want a [beginner|@level:level] program to [build muscle|@goal:goal]",
+    "workout split for [3|@sys.number-integer:days] days",
   ],
   params: [
     { name: "goal", type: "@goal", prompts: ["What's your goal: lose weight, build muscle, get stronger or general fitness?"] },
-    { name: "level", type: "@level", prompts: ["Are you a beginner, intermediate or advanced?"] },
+    { name: "level", type: "@level", required: false, prompts: [] },
     { name: "days", type: "@sys.number-integer", prompts: ["How many days a week can you train?"] },
   ],
   replies: ["Building your plan…"],
+});
+
+intent("Fitness Question", {
+  webhook: true,
+  phrases: [
+    "what should I eat before training",
+    "what should I eat after the gym",
+    "how much protein do I need",
+    "is creatine safe",
+    "should I take supplements",
+    "how do I lose belly fat",
+    "how many calories should I eat",
+    "how long should I rest between sets",
+    "is it ok to train when I'm sore",
+    "how do I stretch after a workout",
+    "how much water should I drink",
+    "how many hours should I sleep to build muscle",
+    "what is a good pre workout meal",
+    "cardio or weights first",
+  ],
+  replies: ["Let me check…"],
 });
 
 intent("Thanks", {

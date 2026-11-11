@@ -42,7 +42,7 @@ interface CompleteOptions {
 export async function complete(
   messages: Message[],
   { tools = [], maxTokens, signal }: CompleteOptions = {}
-): Promise<AssistantMessage> {
+): Promise<AssistantMessage & { truncated: boolean }> {
   const provider = getProvider();
   if (!provider.apiKey) {
     throw new Error(`${provider.keyEnv} is not set on the server.`);
@@ -68,8 +68,10 @@ export async function complete(
     throw new Error(`${provider.name} returned ${res.status}: ${await res.text()}`);
   }
 
-  const data = (await res.json()) as { choices: { message: AssistantMessage }[] };
-  const message = data.choices?.[0]?.message;
-  if (!message) throw new Error(`${provider.name} returned no message.`);
-  return message;
+  const data = (await res.json()) as {
+    choices: { message: AssistantMessage; finish_reason?: string }[];
+  };
+  const choice = data.choices?.[0];
+  if (!choice?.message) throw new Error(`${provider.name} returned no message.`);
+  return { ...choice.message, truncated: choice.finish_reason === "length" };
 }
