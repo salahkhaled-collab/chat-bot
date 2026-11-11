@@ -18,8 +18,6 @@ function $<T extends HTMLElement>(id: string): T {
 }
 
 const log = $<HTMLElement>("log");
-const intro = $<HTMLElement>("intro");
-const examples = $<HTMLUListElement>("examples");
 const form = $<HTMLFormElement>("form");
 const input = $<HTMLTextAreaElement>("input");
 const send = $<HTMLButtonElement>("send");
@@ -27,6 +25,8 @@ const reset = $<HTMLButtonElement>("reset");
 
 let history: HistoryItem[] = [];
 let busy = false;
+
+const WELCOME = "Hi! Ask me about any sport — results, fixtures, standings, rules or training.";
 
 function scrollToBottom(): void {
   log.scrollTop = log.scrollHeight;
@@ -59,12 +59,11 @@ function setBusy(value: boolean): void {
 
 async function ask(text: string): Promise<void> {
   if (busy) return;
-  intro.hidden = true;
   addMessage("user", text);
 
   const body = addMessage("assistant", "");
   body.classList.add("pending");
-  body.textContent = "Looking that up...";
+  body.textContent = "Looking that up…";
   setBusy(true);
 
   try {
@@ -117,19 +116,15 @@ input.addEventListener("keydown", (e) => {
   }
 });
 
-examples.addEventListener("click", (e) => {
-  const button = (e.target as HTMLElement).closest("button");
-  if (button?.textContent) void ask(button.textContent);
-});
-
 reset.addEventListener("click", () => {
   if (busy) return;
   history = [];
-  log.querySelectorAll(".message").forEach((m) => m.remove());
-  intro.hidden = false;
+  log.replaceChildren();
+  addMessage("assistant", WELCOME);
   input.value = "";
   resizeInput();
   input.focus();
 });
 
+addMessage("assistant", WELCOME);
 input.focus();
