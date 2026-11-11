@@ -1,6 +1,3 @@
-// Tiny, safe formatter for model replies: escapes all HTML first, then adds
-// bold, italics, inline code, links, bullet/numbered lists and simple tables.
-
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")

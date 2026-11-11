@@ -47,7 +47,6 @@ button, textarea { font: inherit; color: inherit; }
   padding: 0 16px;
 }
 
-/* Header */
 .topbar {
   display: flex;
   align-items: center;
@@ -72,7 +71,6 @@ button, textarea { font: inherit; color: inherit; }
 }
 .link-button:hover { color: var(--ink); border-color: var(--muted); }
 
-/* Conversation */
 .log {
   flex: 1;
   overflow-y: auto;
@@ -125,7 +123,6 @@ button, textarea { font: inherit; color: inherit; }
 .body th, .body td { border-bottom: 1px solid var(--line); padding: 6px 10px; text-align: left; white-space: nowrap; }
 .body th { font-weight: 650; border-bottom-color: var(--muted); }
 
-/* Composer */
 .composer {
   display: flex;
   gap: 8px;

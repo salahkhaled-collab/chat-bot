@@ -1,6 +1,3 @@
-// Vercel serverless function: POST /api/chat
-// Body: { message: string, history?: { role: "user" | "assistant", content: string }[] }
-// Reply: { reply: string } or { error: string }
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { complete } from "./_lib/llm";
 import { tools } from "./_lib/sports";
@@ -21,8 +18,6 @@ function systemPrompt(): string {
   ].join("\n");
 }
 
-// The browser sends history; only accept plain user/assistant text so a client
-// can't inject system prompts or fake tool results.
 function cleanHistory(raw: unknown): Message[] {
   if (!Array.isArray(raw)) return [];
   return raw

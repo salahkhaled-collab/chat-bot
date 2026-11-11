@@ -1,5 +1,3 @@
-// Shared types for the chat API (OpenAI-compatible chat format, used by both Groq and xAI).
-
 export interface ToolCall {
   id: string;
   type: "function";

@@ -1,12 +1,3 @@
-// Sports data tools the model can call.
-//
-// Default source: TheSportsDB (https://www.thesportsdb.com), which covers
-// football, basketball, ice hockey, baseball, rugby, motorsport and more.
-// The free test key "3" works but is rate-limited and some endpoints return
-// partial data; set SPORTSDB_KEY to a paid key for full coverage.
-//
-// Optional: set SPORTS_API_URL (+ SPORTS_API_KEY) to add your own API as an
-// extra tool, e.g. the one from the curl you already have.
 import type { Tool, ToolArgs } from "./types";
 
 const SPORTSDB_KEY = process.env.SPORTSDB_KEY || "3";
@@ -22,7 +13,6 @@ async function sportsDb(path: string, params: Record<string, string>): Promise<R
   return (await res.json()) as Row;
 }
 
-// Keep only the fields the model needs so we don't flood its context.
 function pick(rows: unknown, fields: string[], limit = 10): Row[] {
   if (!Array.isArray(rows)) return [];
   return rows.slice(0, limit).map((row: Row) => {
@@ -162,7 +152,6 @@ const customApi: Tool = {
     },
   },
   async run(args) {
-    // Mirror your curl here: same URL, query params and headers.
     const url = new URL(process.env.SPORTS_API_URL as string);
     url.searchParams.set("sport", str(args, "sport"));
     url.searchParams.set("q", str(args, "query"));

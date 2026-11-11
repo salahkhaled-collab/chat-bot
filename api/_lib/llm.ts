@@ -1,11 +1,3 @@
-// Model provider. Groq and xAI (Grok) both expose an OpenAI-compatible
-// /chat/completions endpoint, so switching between them is only config.
-//
-// Env vars:
-//   LLM_PROVIDER  "groq" | "xai"   (optional; defaults to xai if XAI_API_KEY is set, else groq)
-//   GROQ_API_KEY  key from console.groq.com
-//   XAI_API_KEY   key from console.x.ai
-//   LLM_MODEL     optional model override (model names change often, check the provider's docs)
 import type { AssistantMessage, Message, ToolDefinition } from "./types";
 
 interface Provider {
