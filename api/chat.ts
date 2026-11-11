@@ -1,136 +1,84 @@
 // Vercel serverless function: POST /api/chat
-// Env vars (set in Vercel dashboard): GROQ_API_KEY, optionally SPORTS_API_URL, SPORTS_API_KEY
+// Body: { message: string, history?: { role: "user" | "assistant", content: string }[] }
+// Reply: { reply: string } or { error: string }
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { complete } from "./_lib/llm";
+import { tools } from "./_lib/sports";
+import type { Message } from "./_lib/types";
 
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile"; // supports tool use
+const MAX_TOOL_ROUNDS = 5;
+const MAX_HISTORY = 20;
+const MAX_CHARS = 4000;
 
-// ---- Types ---------------------------------------------------------------
-interface ToolCall {
-  id: string;
-  type: "function";
-  function: { name: string; arguments: string };
+function systemPrompt(): string {
+  const today = new Date().toISOString().slice(0, 10);
+  return [
+    `You are the assistant for a sports management project. Today is ${today}.`,
+    "Answer questions about any sport: rules, tactics, training, history, records, players, teams, leagues and results.",
+    "For anything time-sensitive (scores, fixtures, standings, current squads or transfers) call the tools first.",
+    "Never invent scores, dates or statistics. If the tools return nothing, say the live data is unavailable and, if useful, give what you know with the year it is from.",
+    "Keep answers short and direct. Use a small table or list only when it helps.",
+  ].join("\n");
 }
 
-type Message =
-  | { role: "system" | "user"; content: string }
-  | { role: "assistant"; content: string | null; tool_calls?: ToolCall[] }
-  | { role: "tool"; tool_call_id: string; content: string };
-
-interface SportsArgs {
-  sport: string;
-  query: string;
+// The browser sends history; only accept plain user/assistant text so a client
+// can't inject system prompts or fake tool results.
+function cleanHistory(raw: unknown): Message[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (m): m is { role: "user" | "assistant"; content: string } =>
+        !!m &&
+        (m.role === "user" || m.role === "assistant") &&
+        typeof m.content === "string"
+    )
+    .slice(-MAX_HISTORY)
+    .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_CHARS) }));
 }
 
-interface ChatRequest {
-  message: string;
-  history?: Message[];
+async function runTool(name: string, rawArgs: string): Promise<unknown> {
+  const tool = tools.find((t) => t.definition.function.name === name);
+  if (!tool) return { error: `Unknown tool ${name}` };
+  try {
+    return await tool.run(JSON.parse(rawArgs || "{}"));
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
-// ---- Tool: PUT YOUR CURL HERE --------------------------------------------
-// Translate the curl you have into this fetch call: same URL, same headers,
-// same query params. Whatever it returns goes back to the model as JSON.
-async function getSportsData({ sport, query }: SportsArgs): Promise<unknown> {
-  const url = new URL(
-    process.env.SPORTS_API_URL ?? "https://example.com/replace-with-your-curl-url"
-  );
-  url.searchParams.set("sport", sport);
-  url.searchParams.set("q", query);
-
-  const res = await fetch(url, {
-    headers: {
-      // Copy the headers from your curl, e.g. an API key:
-      "x-api-key": process.env.SPORTS_API_KEY ?? "",
-    },
-  });
-  if (!res.ok) return { error: `Sports API returned ${res.status}` };
-  return res.json();
-}
-
-const tools = [
-  {
-    type: "function",
-    function: {
-      name: "get_sports_data",
-      description:
-        "Look up live or recent sports data: scores, standings, fixtures, player stats. Use for any question about a current or recent sports result.",
-      parameters: {
-        type: "object",
-        properties: {
-          sport: { type: "string", description: "e.g. football, basketball, tennis" },
-          query: { type: "string", description: "Team, player or league the user asked about" },
-        },
-        required: ["sport", "query"],
-      },
-    },
-  },
-] as const;
-
-const toolImpls: Record<string, (args: SportsArgs) => Promise<unknown>> = {
-  get_sports_data: getSportsData,
-};
-
-// ---- Groq + tool-use loop -------------------------------------------------
-async function groq(messages: Message[]) {
-  const res = await fetch(GROQ_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: MODEL, messages, tools, tool_choice: "auto" }),
-  });
-  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as {
-    choices: { message: Extract<Message, { role: "assistant" }> }[];
-  };
-  return data.choices[0].message;
-}
-
-async function chat(userMessage: string, history: Message[] = []): Promise<string> {
+async function chat(userMessage: string, history: Message[]): Promise<string> {
   const messages: Message[] = [
-    {
-      role: "system",
-      content:
-        "You are a sports assistant. Use get_sports_data for any factual sports question. If the tool returns an error or nothing, say so; never invent scores.",
-    },
+    { role: "system", content: systemPrompt() },
     ...history,
     { role: "user", content: userMessage },
   ];
+  const definitions = tools.map((t) => t.definition);
 
-  for (let i = 0; i < 5; i++) {
-    const msg = await groq(messages);
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const msg = await complete(messages, definitions);
     messages.push(msg);
-
     if (!msg.tool_calls?.length) return msg.content ?? "";
 
     for (const call of msg.tool_calls) {
-      let result: unknown;
-      try {
-        const args = JSON.parse(call.function.arguments) as SportsArgs;
-        const impl = toolImpls[call.function.name];
-        result = impl ? await impl(args) : { error: `Unknown tool ${call.function.name}` };
-      } catch (e) {
-        result = { error: String(e) };
-      }
+      const result = await runTool(call.function.name, call.function.arguments);
       messages.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result) });
     }
   }
-  return "Sorry, I couldn't complete that request.";
+  return "I couldn't finish looking that up. Try asking a narrower question.";
 }
 
-// ---- Handler --------------------------------------------------------------
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
-  if (!process.env.GROQ_API_KEY) {
-    return res.status(500).json({ error: "GROQ_API_KEY is not configured on the server yet." });
-  }
+
+  const body = (req.body ?? {}) as { message?: unknown; history?: unknown };
+  const message = typeof body.message === "string" ? body.message.trim() : "";
+  if (!message) return res.status(400).json({ error: "Missing message" });
+
   try {
-    const { message, history } = req.body as ChatRequest;
-    if (!message) return res.status(400).json({ error: "Missing message" });
-    const reply = await chat(message, history);
+    const reply = await chat(message.slice(0, MAX_CHARS), cleanHistory(body.history));
     return res.status(200).json({ reply });
   } catch (e) {
-    return res.status(500).json({ error: String(e) });
+    console.error(e);
+    return res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
   }
 }

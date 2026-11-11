@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sports Bot</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">SB</span>
+          <div>
+            <h1>Sports Bot</h1>
+            <p>Sports management assistant</p>
+          </div>
+        </div>
+        <button id="reset" class="link-button" type="button">New chat</button>
+      </header>
+
+      <main id="log" class="log" aria-live="polite">
+        <section id="intro" class="intro">
+          <h2>What do you want to know?</h2>
+          <p>Results, fixtures, standings, players, rules, training or history. Any sport.</p>
+          <ul id="examples" class="examples">
+            <li><button type="button">Al Ahly's last 5 results</button></li>
+            <li><button type="button">How does the offside rule work?</button></li>
+            <li><button type="button">Who has the most NBA championships?</button></li>
+            <li><button type="button">Weekly training plan for a U16 football team</button></li>
+          </ul>
+        </section>
+      </main>
+
+      <form id="form" class="composer" autocomplete="off">
+        <label for="input" class="visually-hidden">Message</label>
+        <textarea id="input" rows="1" placeholder="Type a question" required></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+      <p class="hint">Enter to send, Shift + Enter for a new line.</p>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
